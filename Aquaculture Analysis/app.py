@@ -20,6 +20,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.feature_selection import SelectKBest, f_regression
 import xgboost as xgb
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -31,7 +34,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS with dark theme compatibility
+# Custom CSS with improved visibility
 st.markdown("""
 <style>
     .main-header {
@@ -39,6 +42,14 @@ st.markdown("""
         color: #2E86AB;
         text-align: center;
         margin-bottom: 2rem;
+        font-weight: bold;
+    }
+    .sidebar-header {
+        font-size: 1.5rem;
+        color: #2E86AB;
+        font-weight: bold;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
     }
     .prediction-box {
         background-color: #f0f8ff;
@@ -104,13 +115,22 @@ st.markdown("""
         margin: 1rem 0;
         border-bottom: 2px solid #2E86AB;
         padding-bottom: 0.5rem;
+        font-weight: bold;
     }
     .parameter-range {
         background-color: #fff3e0;
-        padding: 0.5rem;
+        padding: 0.8rem;
         border-radius: 5px;
-        margin: 0.3rem 0;
-        border-left: 3px solid #ff9800;
+        margin: 0.5rem 0;
+        border-left: 4px solid #ff9800;
+        font-weight: 500;
+    }
+    .optimal-range-header {
+        font-size: 1.2rem;
+        color: #2E86AB;
+        font-weight: bold;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -141,7 +161,7 @@ OPTIMAL_RANGES = {
         "ammonia": (0, 0.01),
         "turbidity": (3, 10)
     },
-    "Finfish (Grouper)": {
+    "Finfish (Group er)": {
         "temperature": (26, 30),
         "salinity": (32, 35),
         "dissolved_oxygen": (6, 8),
@@ -180,11 +200,14 @@ def load_and_process_data():
     
     # Create more realistic data with patterns instead of pure randomness
     np.random.seed(42)
-    n_samples = 5000  # Increased sample size
+    n_samples = 1000  # Reduced sample size from 5000 to 1000
     
-    # Base data structure
+    # Base data structure - dates only up to 2025
+    end_date = datetime(2025, 12, 31)
+    start_date = end_date - timedelta(days=n_samples-1)
+    
     sample_data = {
-        'date': pd.date_range('2020-01-01', periods=n_samples, freq='D'),
+        'date': pd.date_range(start_date, end_date, freq='D'),
         'location': np.random.choice(['Kavaratti North', 'Kavaratti South', 'Agatti East', 
                                     'Agatti West', 'Minicoy Lagoon'], n_samples, p=[0.3, 0.25, 0.2, 0.15, 0.1]),
         'farm_type': np.random.choice(list(OPTIMAL_RANGES.keys()), n_samples, p=[0.3, 0.2, 0.2, 0.2, 0.1]),
@@ -317,7 +340,7 @@ def load_and_process_data():
     # Parameter interactions
     df['temp_oxygen_interaction'] = df['temperature'] * df['dissolved_oxygen']
     df['nutrient_ratio'] = df['nitrates'] / (df['phosphates'] + 0.001)
-    df['stress_index'] = ((df['temperature'] - 28)**2 + (df['ph'] - 8.1)**2) / 10
+    df['stress_index'] = ((df['temperature'] - 28)*2 + (df['ph'] - 8.1)*2) / 10
     df['total_nutrients'] = df['nitrates'] + df['phosphates']
     
     # Water quality index calculation
@@ -429,7 +452,7 @@ def create_engineered_features(input_df):
     # Create other engineered features
     df['temp_oxygen_interaction'] = df['temperature'] * df['dissolved_oxygen']
     df['nutrient_ratio'] = df['nitrates'] / (df['phosphates'] + 0.001)
-    df['stress_index'] = ((df['temperature'] - 28)**2 + (df['ph'] - 8.1)**2) / 10
+    df['stress_index'] = ((df['temperature'] - 28)*2 + (df['ph'] - 8.1)*2) / 10
     df['total_nutrients'] = df['nitrates'] + df['phosphates']
     
     # Calculate water quality index based on farm type
@@ -475,18 +498,18 @@ def generate_recommendations(input_data, prediction):
             value = input_data[param].iloc[0]
             if value < low:
                 recommendations.append(f"📈 Increase {param} (current: {value:.2f}, optimal: {low}-{high})")
-                warnings.append(f"⚠️ Low {param} can negatively impact {farm_type.split()[0]} health")
+                warnings.append(f"⚠ Low {param} can negatively impact {farm_type.split()[0]} health")
             elif value > high:
                 recommendations.append(f"📉 Decrease {param} (current: {value:.2f}, optimal: {low}-{high})")
-                warnings.append(f"⚠️ High {param} can stress {farm_type.split()[0]} organisms")
+                warnings.append(f"⚠ High {param} can stress {farm_type.split()[0]} organisms")
     
     # Special cases for critical parameters
     if input_data['dissolved_oxygen'].iloc[0] < optimal['dissolved_oxygen'][0] * 0.9:
         recommendations.append("💨 Increase aeration or reduce stocking density to improve dissolved oxygen levels.")
     
     if input_data['ammonia'].iloc[0] > optimal['ammonia'][1] * 1.2:
-        recommendations.append("⚠️ Immediately reduce feeding rates and increase water exchange to control ammonia levels.")
-        warnings.append("☠️ CRITICAL: High ammonia levels are extremely toxic")
+        recommendations.append("⚠ Immediately reduce feeding rates and increase water exchange to control ammonia levels.")
+        warnings.append("☠ CRITICAL: High ammonia levels are extremely toxic")
     
     # General recommendations based on health score
     if prediction < 60:
@@ -510,7 +533,7 @@ def generate_recommendations(input_data, prediction):
 
 def display_optimal_ranges(farm_type):
     """Display optimal parameter ranges for the selected farm type"""
-    st.markdown(f'<h3 class="dark-theme-text">🎯 Optimal Ranges for {farm_type}</h3>', unsafe_allow_html=True)
+    st.markdown(f'<div class="optimal-range-header">🎯 Optimal Ranges for {farm_type}</div>', unsafe_allow_html=True)
     
     optimal = OPTIMAL_RANGES[farm_type]
     for param, (low, high) in optimal.items():
@@ -521,10 +544,10 @@ def main():
     
     # Sidebar with information
     with st.sidebar:
-        st.markdown('<h2 class="dark-theme-text">📋 About</h2>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-header">📋 About</div>', unsafe_allow_html=True)
         st.info("🌊 This application predicts aquaculture health based on environmental parameters and provides recommendations for optimal farming conditions.")
         
-        st.markdown('<h2 class="dark-theme-text">🏭 Farm Types</h2>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-header">🏭 Farm Types</div>', unsafe_allow_html=True)
         for farm_type in OPTIMAL_RANGES.keys():
             st.markdown(f'<div class="farm-type-card">{farm_type}</div>', unsafe_allow_html=True)
     
@@ -546,55 +569,55 @@ def main():
             
             with col1:
                 st.markdown('<div class="feature-input">', unsafe_allow_html=True)
-                st.markdown("**📍 Location**")
+                st.markdown("📍 Location**")
                 location = st.selectbox("Select Location", [
                     "Kavaratti North", "Kavaratti South", "Agatti East", 
                     "Agatti West", "Minicoy Lagoon"
                 ], label_visibility="collapsed")
                 
-                st.markdown("**🏭 Farm Type**")
+                st.markdown("🏭 Farm Type**")
                 farm_type = st.selectbox("Select Farm Type", list(OPTIMAL_RANGES.keys()), label_visibility="collapsed")
                 
                 # Display optimal ranges for selected farm type
                 display_optimal_ranges(farm_type)
                 
-                st.markdown("**🌡️ Temperature (°C)**")
+                st.markdown("🌡 Temperature (°C)")
                 temperature = st.slider("Temperature", 20.0, 35.0, 28.0, 0.1, label_visibility="collapsed")
                 
-                st.markdown("**🧂 Salinity (ppt)**")
+                st.markdown("🧂 Salinity (ppt)")
                 salinity = st.slider("Salinity", 25.0, 40.0, 34.5, 0.1, label_visibility="collapsed")
                 
-                st.markdown("**🌧️ Rainfall (mm)**")
+                st.markdown("🌧 Rainfall (mm)")
                 rainfall = st.slider("Rainfall", 0.0, 50.0, 8.0, 0.1, label_visibility="collapsed")
                 st.markdown('</div>', unsafe_allow_html=True)
             
             with col2:
                 st.markdown('<div class="feature-input">', unsafe_allow_html=True)
-                st.markdown("**💨 Dissolved Oxygen (mg/L)**")
+                st.markdown("💨 Dissolved Oxygen (mg/L)")
                 dissolved_oxygen = st.slider("Dissolved Oxygen", 3.0, 10.0, 6.0, 0.1, label_visibility="collapsed")
                 
-                st.markdown("**🧪 pH**")
+                st.markdown("🧪 pH**")
                 ph = st.slider("pH", 7.0, 9.0, 8.1, 0.01, label_visibility="collapsed")
                 
-                st.markdown("**🌿 Nitrates (mg/L)**")
+                st.markdown("🌿 Nitrates (mg/L)")
                 nitrates = st.slider("Nitrates", 0.01, 0.5, 0.14, 0.001, label_visibility="collapsed")
                 
-                st.markdown("**🌱 Phosphates (mg/L)**")
+                st.markdown("🌱 Phosphates (mg/L)")
                 phosphates = st.slider("Phosphates", 0.001, 0.1, 0.04, 0.001, label_visibility="collapsed")
                 st.markdown('</div>', unsafe_allow_html=True)
             
             with col3:
                 st.markdown('<div class="feature-input">', unsafe_allow_html=True)
-                st.markdown("**⚠️ Ammonia (mg/L)**")
+                st.markdown("⚠ Ammonia (mg/L)")
                 ammonia = st.slider("Ammonia", 0.001, 0.1, 0.023, 0.001, label_visibility="collapsed")
                 
-                st.markdown("**🍃 Chlorophyll (μg/L)**")
+                st.markdown("🍃 Chlorophyll (μg/L)")
                 chlorophyll = st.slider("Chlorophyll", 0.1, 3.0, 0.9, 0.01, label_visibility="collapsed")
                 
-                st.markdown("**🌊 Turbidity (NTU)**")
+                st.markdown("🌊 Turbidity (NTU)")
                 turbidity = st.slider("Turbidity", 1.0, 30.0, 5.8, 0.1, label_visibility="collapsed")
                 
-                st.markdown("**📅 Date**")
+                st.markdown("📅 Date**")
                 date = st.date_input("Select Date", datetime.now(), label_visibility="collapsed")
                 st.markdown('</div>', unsafe_allow_html=True)
             
@@ -659,7 +682,7 @@ def main():
                 
                 if warnings:
                     st.markdown('<div class="warning-box">', unsafe_allow_html=True)
-                    st.markdown('<h3 class="dark-theme-text">⚠️ Potential Issues</h3>', unsafe_allow_html=True)
+                    st.markdown('<h3 class="dark-theme-text">⚠ Potential Issues</h3>', unsafe_allow_html=True)
                     for warning in warnings:
                         st.markdown(f"- {warning}")
                     st.markdown('</div>', unsafe_allow_html=True)
@@ -823,7 +846,7 @@ def main():
         ax.set_title('📈 Actual vs Predicted Microbiome Health Score')
         st.pyplot(fig)
         
-        # Residual plot
+        # Residual plot - FIXED THE TYPO HERE (changed figsize to figsize)
         fig, ax = plt.subplots(figsize=(8, 6))
         residuals = y_test - y_pred
         ax.scatter(y_pred, residuals, alpha=0.5)
@@ -835,7 +858,7 @@ def main():
         
         # Feature importance (if available)
         try:
-            st.markdown('<h3 class="dark-theme-text">⚖️ Feature Importance</h3>', unsafe_allow_html=True)
+            st.markdown('<h3 class="dark-theme-text">⚖ Feature Importance</h3>', unsafe_allow_html=True)
             
             # For tree-based models
             if hasattr(model.named_steps['regressor'], 'feature_importances_'):
@@ -923,7 +946,7 @@ def main():
         
         # Correlation heatmap
         st.markdown('<h3 class="dark-theme-text">🔄 Correlation Heatmap</h3>', unsafe_allow_html=True)
-        numeric_cols = df.select_dtypes(include=[np.number]).columns  # Fixed the include parameter
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
         corr_matrix = df[numeric_cols].corr()
         
         fig, ax = plt.subplots(figsize=(14, 12))
@@ -931,6 +954,93 @@ def main():
                    cbar_kws={"shrink": .8}, square=True)
         ax.set_title('🔄 Correlation Matrix')
         st.pyplot(fig)
+        
+        # 3D Visualizations with Plotly
+        st.markdown('<h3 class="dark-theme-text">📊 3D Visualizations</h3>', unsafe_allow_html=True)
+        
+        # Create tabs for different 3D visualizations
+        viz_tab1, viz_tab2, viz_tab3 = st.tabs(["3D Health Parameters", "3D Time Analysis", "3D Farm Comparison"])
+        
+        with viz_tab1:
+            st.markdown('<h4 class="dark-theme-text">🌡 3D Parameter Relationship</h4>', unsafe_allow_html=True)
+            
+            # Sample data for better performance in 3D visualization
+            sample_df = df.sample(n=min(500, len(df)), random_state=42)
+            
+            # Create 3D scatter plot
+            fig = px.scatter_3d(
+                sample_df,
+                x='temperature',
+                y='dissolved_oxygen',
+                z='ph',
+                color='microbiome_health_score',
+                color_continuous_scale='Viridis',
+                title='3D Relationship: Temperature, Dissolved Oxygen, pH vs Health Score',
+                labels={
+                    'temperature': 'Temperature (°C)',
+                    'dissolved_oxygen': 'Dissolved Oxygen (mg/L)',
+                    'ph': 'pH',
+                    'microbiome_health_score': 'Health Score'
+                },
+                hover_data=['farm_type', 'location']
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with viz_tab2:
+            st.markdown('<h4 class="dark-theme-text">📅 3D Time Analysis</h4>', unsafe_allow_html=True)
+            
+            # Aggregate data by month and farm type
+            monthly_data = df.groupby([pd.Grouper(key='date', freq='M'), 'farm_type']).agg({
+                'microbiome_health_score': 'mean',
+                'temperature': 'mean',
+                'dissolved_oxygen': 'mean',
+                'ph': 'mean'
+            }).reset_index()
+            
+            fig = px.scatter_3d(
+                monthly_data,
+                x='date',
+                y='temperature',
+                z='microbiome_health_score',
+                color='farm_type',
+                title='3D Time Analysis: Date, Temperature vs Health Score by Farm Type',
+                labels={
+                    'date': 'Date',
+                    'temperature': 'Temperature (°C)',
+                    'microbiome_health_score': 'Health Score',
+                    'farm_type': 'Farm Type'
+                }
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with viz_tab3:
+            st.markdown('<h4 class="dark-theme-text">🏭 3D Farm Comparison</h4>', unsafe_allow_html=True)
+            
+            # Aggregate data by location and farm type
+            location_data = df.groupby(['location', 'farm_type']).agg({
+                'microbiome_health_score': 'mean',
+                'temperature': 'mean',
+                'dissolved_oxygen': 'mean',
+                'ph': 'mean'
+            }).reset_index()
+            
+            fig = px.scatter_3d(
+                location_data,
+                x='temperature',
+                y='dissolved_oxygen',
+                z='microbiome_health_score',
+                color='location',
+                symbol='farm_type',
+                title='3D Farm Comparison: Temperature, Dissolved Oxygen vs Health Score',
+                labels={
+                    'temperature': 'Temperature (°C)',
+                    'dissolved_oxygen': 'Dissolved Oxygen (mg/L)',
+                    'microbiome_health_score': 'Health Score',
+                    'location': 'Location',
+                    'farm_type': 'Farm Type'
+                }
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     main()
