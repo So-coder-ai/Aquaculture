@@ -100,6 +100,3 @@ See `requirements.txt` for the exact list. Main libraries:
 ## Contributing
 - Open an issue or submit a pull request in the GitHub repository.
 - For larger changes, please discuss via an issue first.
-
-## License
-Specify a license for your project (e.g., MIT, Apache-2.0). If you want, I can add a LICENSE file—let me know your preference.
