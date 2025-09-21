@@ -1,0 +1,52 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Distribution / packaging
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# Streamlit
+.streamlit/
+
+# Data files (keep large or private data out of git)
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.xlsx
+
+# Models and artifacts
+*.pkl
+*.joblib
+
+# Environment / secrets
+.env
+*.env
+
+# C build artifacts
+*.o
+*.out
+*.exe
